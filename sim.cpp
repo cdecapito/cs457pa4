@@ -47,6 +47,8 @@ const string UPDATE = "UPDATE";
 const string DELETE = "DELETE";
 const string EXIT = ".EXIT";
 
+bool BEGINTRANSACTION = false;
+
 const int ERROR_DB_EXISTS = -1;
 const int ERROR_DB_NOT_EXISTS = -2;
 const int ERROR_TBL_EXISTS = -3;
@@ -795,7 +797,7 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 		else
 		{
 			//update values
-			tblTemp.tableUpdate( currentWorkingDirectory, currentDatabase, wCond, sCond );
+			tblTemp.tableUpdate( currentWorkingDirectory, currentDatabase, wCond, sCond, BEGINTRANSACTION );
 		}
 	}
 	else if( actionType.compare( DELETE ) == 0 )
@@ -831,13 +833,22 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 	{
 		exitProgram = true;
 	}
+	else if( caseInsCompare( actionType, "begin" ) && caseInsCompare( getNextWord( input ), "transaction" ) )
+	{
+		//will lock table on next call
+		BEGINTRANSACTION = true;
+		cout << "-- Transaction starts. " << endl;
+	}
+	else if( caseInsCompare( actionType, "commit" ) )
+	{
+
+	}
 	else
 	{
 		errorExists = true;
 		errorType = ERROR_INCORRECT_COMMAND;
 		errorContainerName = originalInput;
 	}
-
 	if( errorExists )
 	{
 		handleError( errorType, actionType, errorContainerName );

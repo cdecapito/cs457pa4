@@ -18,6 +18,7 @@
 #include <fstream>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include "Table.h"
 
 using namespace std;
@@ -38,6 +39,7 @@ void getWhereCondition( WhereCondition &wCond, string whereType, vector< Attribu
 void getSetCondition( SetCondition &sCond, string setType, vector< Attribute > attributes );
 bool currIndexIsSubset( vector< AttributeSubset > attrSubsets, int indexVal );
 bool indexExists( int i, vector< int > indexCounter );
+bool fileExists( string filename );
 /**
  * @brief getCommaCount
  *
@@ -292,6 +294,9 @@ void Table::tableCreate( string currentWorkingDirectory, string currentDatabase,
 
 	//get filepath, Database name + table name
 	string filePath = "/" + currentDatabase + "/" + tblName;
+
+	tableTempName = tableName;
+	cout << "TABLE NAME " << tableTempName << endl;
 	//output to file using ofstream operator
 	ofstream fout( ( currentWorkingDirectory + filePath ).c_str() );
 
@@ -1078,16 +1083,30 @@ void Table::tableInsert( string currentWorkingDirectory, string currentDatabase,
  *@param [in] string setType
  *
 */
-void Table::tableUpdate( string currentWorkingDirectory, string currentDatabase, string whereType, string setType )
+void Table::tableUpdate( string currentWorkingDirectory, string currentDatabase, string whereType, string setType, bool beginTransaction )
 {
 	vector< Attribute > attributes;
 	SetCondition sCond;
 	WhereCondition wCond;
-	string filePath = "/" + currentDatabase + "/" + tableName;
+	string filePath = "/" + currentDatabase + "/" + tableTempName;
 	string temp;
 	int recordsModified = 0;
 	int contentLineCount = 0;
 	double tempDouble;
+
+	cout << "TABLETEMP NAME " << tableTempName << endl;
+
+	cout << "FILE PATH " << filePath << endl;
+	//check if table is locked before updating
+	if( !tableLock( currentWorkingDirectory, currentDatabase ) )
+	{
+		//output error if another process has control of the table
+		cout << "-- Error: Table " << tableName << " is locked!";
+		return;
+	}
+	cout << "FILE PATH " << filePath << endl;
+
+
 	ifstream fin( ( currentWorkingDirectory + filePath ).c_str() );
 
 	//get attributes
@@ -1117,6 +1136,8 @@ void Table::tableUpdate( string currentWorkingDirectory, string currentDatabase,
 
 	fin.close();
 	
+	cout << "before second read " << endl;
+
 	fin.open(( currentWorkingDirectory + filePath ).c_str() );
 	
 	//get attribute and store into temp 
@@ -1135,6 +1156,19 @@ void Table::tableUpdate( string currentWorkingDirectory, string currentDatabase,
 		}
 	}
 	fin.close();
+
+	cout << "before table lock" << endl;
+
+	if( tableLock( currentWorkingDirectory, currentDatabase ) )
+	{
+		cout << "if the table locks" << endl;
+		filePath = tableTempName = tableName + "_temp";
+
+	}
+	else
+	{
+			cout << "after if " << endl;		
+	}
 
 	ofstream fout( ( currentWorkingDirectory + filePath ).c_str() );
 	
@@ -2036,5 +2070,45 @@ void Table::outerJoin( string currentWorkingDirectory, string currentDatabase, s
 }
 
 
+
+
+bool Table::tableLock( string currentWorkingDirectory, string currentDatabase )
+{
+	//does a lock file already exist, if yes then...
+	if( fileExists( tableName + "_temp" ) )
+	{
+		//check if this table owns the lock, if yes then...
+		if( tableIsLocked )
+		{
+			return true;
+		}
+		//another process owns the lock
+		else
+		{
+			return false;
+		}
+	}//the lock does not exist and we can create a temp file
+	else
+	{
+		//create table
+		ofstream fout( ( currentWorkingDirectory + "/" + currentDatabase + "/" + tableName + "_temp" ).c_str(), ofstream::out );
+		tableIsLocked = true;
+		cout << "Created temp table " << endl;
+		return true;
+	}
+}
+
+
+void Table::tableUnlock( string currentWorkingDirectory, string currentDatabase )
+{
+
+}
+
+
+bool fileExists( string filename )
+{
+    struct stat buffer;
+    return (stat(filename.c_str(), &buffer) == 0);
+}
 // Terminating precompiler directives  ////////////////////////////////////////
 #endif
