@@ -48,6 +48,7 @@ class Table{
 		bool tableIsLocked = false;
 
 		Table();
+		Table( const Table& tbl );
 		~Table();
 
 		void tableCreate( string currentWorkingDirectory, string currentDatabase, string tblName, string input, bool &errorCode );

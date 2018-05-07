@@ -20,7 +20,7 @@ update flights set status = 1 where seat = 22;
 --select * from Flights;
 
 -- On P1:
---commit; --persist the change to disk
+commit; --persist the change to disk
 --select * from Flights;
 
 -- On P2:

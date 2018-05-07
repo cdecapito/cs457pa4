@@ -104,6 +104,8 @@ string getOnCondition( string &input );
 
 void removeCarriageReturn( string &input );
 
+Database* getDatabase( vector< Database > &dbms, string databaseName );
+
 /**
  * @brief read_Directory method
  *
@@ -203,8 +205,8 @@ void startSimulation( string currentWorkingDirectory )
 						}
 						else
 						{
-							tempTable.tableName = tableItems[j];
-
+							tempTable.tableTempName = tempTable.tableName = tableItems[j];
+							tempTable.tableIsLocked = false;
 							tempDatabase.databaseTable.push_back(tempTable);
 						}
 					}
@@ -608,7 +610,8 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 
 			//get table name 
 			Table tblTemp;
-			tblTemp.tableName = getNextWord( temp );
+			tblTemp.tableTempName = tblTemp.tableName = getNextWord( temp );
+			tblTemp.tableIsLocked = false;
 
 			//check that table exists
 			if( !(dbms[ dbReturn ].tableExists( tblTemp.tableName, tblReturn )) )
@@ -772,6 +775,27 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 	else if( actionType.compare( UPDATE ) == 0 )
 	{
 		//get index of curr DB
+		bool dbExists = true;
+		bool tblExists = true;
+
+		Database *dbTemp = getDatabase( dbms, currentDatabase );
+		if( dbTemp == NULL )
+		{
+			//db does not exist
+			dbExists = false;
+		}
+
+		string tableName = getNextWord( input );
+
+		Table *tblTemp = dbTemp->getTable( tableName );
+
+		if( tblTemp == NULL )
+		{
+			//table doesent exist
+			tblExists = false;
+		}
+
+		/*
 		Database dbTemp;
 		dbTemp.databaseName = currentDatabase;
 		databaseExists( dbms, dbTemp, dbReturn );
@@ -780,6 +804,7 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 		Table tblTemp;
 		tblTemp.tableName = getNextWord( input );
 		
+		*/
 		//get where condition
 		string wCond = getWhereCondition( input );
 
@@ -787,17 +812,23 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 		string sCond = getSetCondition( input );
 	
 		//check if table exists
-		if( !(dbms[ dbReturn ].tableExists( tblTemp.tableName, tblReturn )) )
+		if( !dbExists )
+		{
+			errorExists = true;
+			errorType = ERROR_DB_NOT_EXISTS;
+			errorContainerName = currentDatabase;
+		}
+		else if( !tblExists )
 		{
 			//if it doesnt exist then return error
 			errorExists = true;
 			errorType = ERROR_TBL_NOT_EXISTS;
-			errorContainerName = tblTemp.tableName;
+			errorContainerName = tableName;
 		}
 		else
 		{
 			//update values
-			tblTemp.tableUpdate( currentWorkingDirectory, currentDatabase, wCond, sCond, BEGINTRANSACTION );
+			tblTemp->tableUpdate( currentWorkingDirectory, currentDatabase, wCond, sCond, BEGINTRANSACTION );
 		}
 	}
 	else if( actionType.compare( DELETE ) == 0 )
@@ -841,7 +872,27 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 	}
 	else if( caseInsCompare( actionType, "commit" ) )
 	{
+		bool dbExists = true;
 
+		Database* dbTemp = getDatabase( dbms, currentDatabase );
+		if( dbTemp == NULL )
+		{
+			dbExists = false;
+		}
+
+		if( dbExists )
+		{
+
+			if( dbTemp->commitTransaction( currentWorkingDirectory ) )
+			{
+				cout << "-- Transaction committed." << endl;
+			}
+			else
+			{
+				cout << "-- Transaction abort." << endl;
+			}
+			BEGINTRANSACTION = false;
+		}
 	}
 	else
 	{
@@ -855,6 +906,39 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 	}
 
 	return exitProgram;
+}
+
+
+/**
+ * @brief 
+ *
+ * @details 
+ *          
+ * @pre 
+ *
+ * @post 
+ *
+ * @par Algorithm 
+ *     
+ * 
+ * @exception 
+ *
+ * @param [in] 
+ *
+ * @return 
+ *
+ * @note None
+ */
+Database* getDatabase( vector< Database > &dbms, string databaseName )
+{
+	for( uint i = 0; i < dbms.size(); i++ )
+	{
+		if( dbms[ i ].databaseName == databaseName )
+		{
+			return &dbms[ i ];
+		}
+	}
+	return NULL;
 }
 
 /**
@@ -893,13 +977,51 @@ bool databaseExists( vector<Database> dbms, Database dbInput, int &dbReturn )
 }
 
 
-
+/**
+ * @brief 
+ *
+ * @details 
+ *          
+ * @pre 
+ *
+ * @post 
+ *
+ * @par Algorithm 
+ *     
+ * 
+ * @exception 
+ *
+ * @param [in] 
+ *
+ * @return 
+ *
+ * @note None
+ */
 void removeDatabase( vector< Database > &dbms, int index )
 {
 	dbms.erase( dbms.begin() + index );
 }
 
-
+/**
+ * @brief 
+ *
+ * @details 
+ *          
+ * @pre 
+ *
+ * @post 
+ *
+ * @par Algorithm 
+ *     
+ * 
+ * @exception 
+ *
+ * @param [in] 
+ *
+ * @return 
+ *
+ * @note None
+ */
 void removeTable( vector< Database > &dbms, int dbReturn, int tblReturn )
 {
 	dbms[ dbReturn ].databaseTable.erase( dbms[ dbReturn ].databaseTable.begin() + tblReturn );
@@ -1295,20 +1417,21 @@ bool checkInnerJoin( string & input, string &LHS  )
 }
 
 /**
- * @brief 
+ * @brief checkouterjoin
  *
- * @details 
+ * @details checks if string contains outer join
  *          
- * @pre 
+ * @pre none
  *
- * @post 
+ * @post return true if outer join
  *
  * @par Algorithm 
  *     
  * 
  * @exception None
  *
- * @param [in] 
+ * @param [in] input provides input string to be returned
+ *			   LHS returns tables in outer join
  *
  * @return 
  *
@@ -1362,16 +1485,16 @@ bool checkOuterJoin( string & input, string &LHS  )
 
 
 /**
- * @brief 
+ * @brief getTableVariable
  *
- * @details 
+ * @details returns valriable of table
  *          
  * @pre 
  *
  * @post 
  *
  * @par Algorithm 
- *     
+ *     parse string
  * 
  * @exception None
  *
@@ -1398,26 +1521,6 @@ string getTableVariable( string &input )
 }
 
 
-/**
- * @brief 
- *
- * @details 
- *          
- * @pre 
- *
- * @post 
- *
- * @par Algorithm 
- *     
- * 
- * @exception None
- *
- * @param [in] 
- *
- * @return 
- *
- * @note None
- */
 string returnLHSJoinComparison( string &input )
 {
 	string LHS;
@@ -1434,26 +1537,6 @@ string returnLHSJoinComparison( string &input )
 }
 
 
-/**
- * @brief 
- *
- * @details 
- *          
- * @pre 
- *
- * @post 
- *
- * @par Algorithm 
- *     
- * 
- * @exception None
- *
- * @param [in] 
- *
- * @return 
- *
- * @note None
- */
 string getOnCondition( string &input )
 {
 	bool onOccurs = false;

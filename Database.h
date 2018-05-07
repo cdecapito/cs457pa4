@@ -34,6 +34,8 @@ class Database{
 		void databaseAlter( string input );
 		void databaseUse();
 		bool tableExists( string &tblName, int &tblReturn );
+		Table* getTable( string tableName );
+		bool commitTransaction( string currentWorkingDirectory );
 };
 
 // Terminating precompiler directives  ////////////////////////////////////////

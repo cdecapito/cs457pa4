@@ -213,5 +213,73 @@ bool Database::tableExists( string &tblName, int &tblReturn )
 	return false;
 }
 
+/**
+ * @brief getTable
+ *
+ * @details returns address of table
+ *          
+ * @pre none
+ *
+ * @post address of table is returned
+ *
+ * @par Algorithm 
+ *     search through all the tables in the current database, return matching one
+ * 
+ * @exception 
+ *
+ * @param [in] tableName	provides string for table to search for
+ *
+ * @return Table*
+ *
+ * @note None
+ */
+Table* Database::getTable( string tableName )
+{
+	for ( uint i = 0; i < databaseTable.size(); i++ )
+	{
+		if( caseInsCompare( databaseTable[ i ].tableName, tableName ) )
+		{
+			return &databaseTable[ i ];
+		}
+	}
+	return NULL;
+}
+
+/**
+ * @brief commitTransaction
+ *
+ * @details returns whether a commit was processed. true if processed, otherwise false
+ *          
+ * @pre none
+ *
+ * @post true is returned if commit was processes, false if abort
+ *
+ * @par Algorithm 
+ *     for each table in the database, unlock 
+ * 
+ * @exception 
+ *
+ * @param [in] currentworkingdirectory provides string for filepath
+ *
+ * @return bool
+ *
+ * @note None
+ */
+bool Database::commitTransaction( string currentWorkingDirectory )
+{
+
+	bool commit = false;
+	for( uint i = 0; i < databaseTable.size(); i++ )
+	{
+		string filePath = "/" + databaseName + "/" + databaseTable[ i ].tableName + "_temp";
+	
+		if( fileExists( currentWorkingDirectory + filePath ) && databaseTable[ i ].tableIsLocked )
+		{
+			databaseTable[ i ].tableUnlock( currentWorkingDirectory, databaseName );
+			commit = true;
+		}
+	}
+	return commit;
+}
 // Terminating precompiler directives  ////////////////////////////////////////
 #endif

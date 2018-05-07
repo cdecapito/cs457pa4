@@ -259,6 +259,13 @@ Table::~Table()
 
 }
 
+Table::Table( const Table& tbl )
+{
+	tableName = tbl.tableName;
+	tableTempName = tbl.tableTempName;
+	tableIsLocked = tbl.tableIsLocked;
+}
+
 
 /**
  * @brief tableCreate
@@ -295,8 +302,6 @@ void Table::tableCreate( string currentWorkingDirectory, string currentDatabase,
 	//get filepath, Database name + table name
 	string filePath = "/" + currentDatabase + "/" + tblName;
 
-	tableTempName = tableName;
-	cout << "TABLE NAME " << tableTempName << endl;
 	//output to file using ofstream operator
 	ofstream fout( ( currentWorkingDirectory + filePath ).c_str() );
 
@@ -1069,6 +1074,8 @@ void Table::tableInsert( string currentWorkingDirectory, string currentDatabase,
 	cout << "-- 1 new record inserted." << endl;
 }
 
+
+
 /**
  *@brief tableUpdate
  *
@@ -1094,18 +1101,14 @@ void Table::tableUpdate( string currentWorkingDirectory, string currentDatabase,
 	int contentLineCount = 0;
 	double tempDouble;
 
-	cout << "TABLETEMP NAME " << tableTempName << endl;
 
-	cout << "FILE PATH " << filePath << endl;
 	//check if table is locked before updating
 	if( !tableLock( currentWorkingDirectory, currentDatabase ) )
 	{
 		//output error if another process has control of the table
-		cout << "-- Error: Table " << tableName << " is locked!";
+		cout << "-- Error: Table " << tableName << " is locked!" << endl;
 		return;
 	}
-	cout << "FILE PATH " << filePath << endl;
-
 
 	ifstream fin( ( currentWorkingDirectory + filePath ).c_str() );
 
@@ -1135,8 +1138,6 @@ void Table::tableUpdate( string currentWorkingDirectory, string currentDatabase,
 	}
 
 	fin.close();
-	
-	cout << "before second read " << endl;
 
 	fin.open(( currentWorkingDirectory + filePath ).c_str() );
 	
@@ -1157,17 +1158,12 @@ void Table::tableUpdate( string currentWorkingDirectory, string currentDatabase,
 	}
 	fin.close();
 
-	cout << "before table lock" << endl;
 
-	if( tableLock( currentWorkingDirectory, currentDatabase ) )
+	if( tableLock( currentWorkingDirectory, currentDatabase ) && beginTransaction )
 	{
-		cout << "if the table locks" << endl;
-		filePath = tableTempName = tableName + "_temp";
+		tableTempName = tableName + "_temp";
+		filePath = "/" + currentDatabase + "/" + tableTempName;
 
-	}
-	else
-	{
-			cout << "after if " << endl;		
 	}
 
 	ofstream fout( ( currentWorkingDirectory + filePath ).c_str() );
@@ -1300,6 +1296,7 @@ void Table::tableUpdate( string currentWorkingDirectory, string currentDatabase,
 					twoDArr[ iIndex ][ jIndex ] = sCond.newValue;
 				}	
 			}
+
 			fout << twoDArr[ iIndex ][ jIndex ];
 			if( jIndex != attributesSize - 1 )
 			{
@@ -1311,6 +1308,8 @@ void Table::tableUpdate( string currentWorkingDirectory, string currentDatabase,
 			fout << endl;
 		}
 	}
+
+	fout.close();
 	cout << "-- " << recordsModified; 
 	if( recordsModified == 1 )
 	{
@@ -1670,22 +1669,27 @@ bool indexExists( int i, vector< int > indexCounter )
 }
 
 /**
- * @brief 
+ * @brief innerJoin
  *
- * @details 
+ * @details uses index join algorithm
  *          
- * @pre 
+ * @pre table1 and table2 must exist
  *
- * @post 
+ * @post output join
  *
  * @par Algorithm 
- *     
+ *     use nested for loops to find similarities between two tables
  * 
  * @exception None
  *
- * @param [in] 
+ * @param [in] currentworkingdirector 	provides string for which directory to get table from
+ 			   currentDatabase 			provides string for current database
+ 			   table1Name				provides the name for table1
+ 			   table2Name				provides the name for table2
+ 			   table1attr 				provides attribute name to be compared
+ 			   table2Attr 				provides attribute name to be compared
  *
- * @return 
+ * @return void
  *
  * @note None
  */
@@ -1859,22 +1863,27 @@ void Table::innerJoin( string currentWorkingDirectory, string currentDatabase, s
 }
 
 /**
- * @brief 
+ * @brief outerJoin
  *
- * @details 
+ * @details uses index join algorithm
  *          
- * @pre 
+ * @pre table1 and table2 must exist
  *
- * @post 
+ * @post output join
  *
  * @par Algorithm 
- *     
+ *     use nested for loops to find similarities between two tables
  * 
  * @exception None
  *
- * @param [in] 
+ * @param [in] currentworkingdirector 	provides string for which directory to get table from
+ 			   currentDatabase 			provides string for current database
+ 			   table1Name				provides the name for table1
+ 			   table2Name				provides the name for table2
+ 			   table1attr 				provides attribute name to be compared
+ 			   table2Attr 				provides attribute name to be compared
  *
- * @return 
+ * @return void
  *
  * @note None
  */
@@ -2070,12 +2079,33 @@ void Table::outerJoin( string currentWorkingDirectory, string currentDatabase, s
 }
 
 
-
-
+/**
+ * @brief tableLock
+ *
+ * @details locks table
+ *          
+ * @pre none
+ *
+ * @post true if we own lock, false if not
+ *
+ * @par Algorithm 
+ *     if table belongs to us, then continue writing to modified file,
+ *		 if file already exists, lock does not belong to us
+ *		 if file doesnt exist, we can take the lock
+ * 
+ * @exception 
+ *
+ * @param [in] 
+ *
+ * @return bool
+ *
+ * @note None
+ */
 bool Table::tableLock( string currentWorkingDirectory, string currentDatabase )
 {
+	string filePath = "/" + currentDatabase + "/" + tableName;
 	//does a lock file already exist, if yes then...
-	if( fileExists( tableName + "_temp" ) )
+	if( fileExists( currentWorkingDirectory + filePath + "_temp" ) )
 	{
 		//check if this table owns the lock, if yes then...
 		if( tableIsLocked )
@@ -2092,19 +2122,67 @@ bool Table::tableLock( string currentWorkingDirectory, string currentDatabase )
 	{
 		//create table
 		ofstream fout( ( currentWorkingDirectory + "/" + currentDatabase + "/" + tableName + "_temp" ).c_str(), ofstream::out );
+		fout.close();
 		tableIsLocked = true;
-		cout << "Created temp table " << endl;
 		return true;
 	}
 }
 
-
+/**
+ * @brief tableUnlock
+ *
+ * @details commits changes for that table
+ *          
+ * @pre table owns the lock and file exists
+ *
+ * @post 
+ *
+ * @par Algorithm 
+ *     remove original table file, then rename modified file to original file name
+ *		reset lock variables
+ * 
+ * @exception 
+ *
+ * @param [in] 
+ *
+ * @return void
+ *
+ * @note None
+ */
 void Table::tableUnlock( string currentWorkingDirectory, string currentDatabase )
 {
+	string filePath = "/" + currentDatabase + "/" + tableName;
+	//remove original file tableName
+	system( ( "rm " + currentWorkingDirectory + filePath ).c_str() );
 
+	//rename temp file to tableName
+	system( ( "mv " + currentWorkingDirectory + filePath + "_temp" + " " +
+					currentWorkingDirectory + filePath ).c_str() );
+
+	tableTempName = tableName;
+	tableIsLocked = false;
 }
 
-
+/**
+ * @brief fileExists
+ *
+ * @details checks if a file path exists 
+ *          
+ * @pre none
+ *
+ * @post returns true if file exists, false if not
+ *
+ * @par Algorithm 
+ *     
+ * 
+ * @exception 
+ *
+ * @param [in] 
+ *
+ * @return bool
+ *
+ * @note None
+ */
 bool fileExists( string filename )
 {
     struct stat buffer;
