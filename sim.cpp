@@ -394,10 +394,14 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 
 	if( caseInsCompare( actionType, SELECT ) )
 	{
+		bool dbExists = true;
+		bool tblExists = true;
 
-		Database dbTemp;
-		dbTemp.databaseName = currentDatabase;
-		databaseExists( dbms, dbTemp, dbReturn );
+		Database* dbTemp = getDatabase( dbms, currentDatabase );
+		if( dbTemp == NULL )
+		{
+			dbExists = false;
+		}
 
 		//get all words before from
 		string qType = getQueryType( input );
@@ -407,6 +411,11 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 
 		Table tblTemp;
 		tblTemp.tableName = tName;
+		Table* tblTempPtr = dbTemp->getTable( tblTemp.tableName );
+		if( tblTempPtr == NULL )
+		{
+			tblExists = false;
+		}
 
 		//join parsing
 		if( returnNextWord( input ) != "where" && !returnNextWord( input ).empty() )
@@ -527,7 +536,13 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 		{
 			string cType = getWhereCondition( input );
 
-			if( !(dbms[ dbReturn ].tableExists( tblTemp.tableName, tblReturn )) )
+			if( !dbExists )
+			{
+				errorExists = true;
+				errorType = ERROR_DB_NOT_EXISTS;
+				errorContainerName = currentDatabase;	
+			}
+			else if( !tblExists )
 			{
 				errorExists = true;
 				errorType = ERROR_TBL_NOT_EXISTS;
@@ -535,7 +550,8 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 			}
 			else
 			{
-				tblTemp.tableSelect( currentWorkingDirectory, currentDatabase, cType, qType );
+				tblTempPtr->tableSelect( currentWorkingDirectory, currentDatabase, cType, qType );
+				//tblTemp.tableSelect( currentWorkingDirectory, currentDatabase, cType, qType );
 			}
 		}
 
@@ -833,21 +849,45 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 	}
 	else if( actionType.compare( DELETE ) == 0 )
 	{
+
+		bool dbExists = true;
+		bool tblExists = true;
+
+		Database* dbTemp = getDatabase( dbms, currentDatabase );
+		if( dbTemp == NULL )
+		{
+			dbExists = false;
+		}
+
+		/*
 		//get index of curr DB
 		Database dbTemp;
 		dbTemp.databaseName = currentDatabase;
 		databaseExists( dbms, dbTemp, dbReturn );
+		*/
 
 		string temp = getQueryType( input );
 		//get table name
 		Table tblTemp;
 		tblTemp.tableName = getNextWord( input );
 
+		Table* tblTempPtr = dbTemp->getTable( tblTemp.tableName );
+		if( tblTempPtr == NULL )
+		{
+			tblExists = false;
+		}
+
 		//get where condition
 		string wCond = getWhereCondition( input );
 	
 		//check if table exists
-		if( !(dbms[ dbReturn ].tableExists( tblTemp.tableName, tblReturn )) )
+		if( !dbExists )
+		{
+			errorExists = true;
+			errorType = ERROR_DB_NOT_EXISTS;
+			errorContainerName = currentDatabase;
+		}
+		else if( !tblExists )
 		{
 			//if it doesnt exist then return error
 			errorExists = true;
@@ -857,7 +897,7 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 		else
 		{
 			//update values
-			tblTemp.tableDelete( currentWorkingDirectory, currentDatabase, wCond );
+			tblTempPtr->tableDelete( currentWorkingDirectory, currentDatabase, wCond, BEGINTRANSACTION );
 		}
 	}
 	else if( actionType.compare( EXIT ) == 0 )
@@ -882,7 +922,6 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 
 		if( dbExists )
 		{
-
 			if( dbTemp->commitTransaction( currentWorkingDirectory ) )
 			{
 				cout << "-- Transaction committed." << endl;

@@ -60,7 +60,7 @@ class Table{
 		
 		void tableInsert( string currentWorkingDirectory, string currentDatabase, string tblName, string input, bool &errorCode );
 		void tableUpdate( string currentWorkingDirectory, string currentDatabase, string whereType, string setType, bool beginTransaction );
-		void tableDelete( string currentWorkingDirectory, string currentDatabase, string whereType);
+		void tableDelete( string currentWorkingDirectory, string currentDatabase, string whereType, bool beginTransaction );
 		
 		void innerJoin( string currentWorkingDirectory, string currentDatabase, string table1Name, string table1Attr, string table2Name, string table2Attr );
 		void outerJoin( string currentWorkingDirectory, string currentDatabase, string table1Name, string table1Attr, string table2Name, string table2Attr );

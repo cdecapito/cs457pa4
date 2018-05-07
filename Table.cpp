@@ -1322,18 +1322,27 @@ void Table::tableUpdate( string currentWorkingDirectory, string currentDatabase,
 }
 
 
-void Table::tableDelete( string currentWorkingDirectory, string currentDatabase, string whereType )
+void Table::tableDelete( string currentWorkingDirectory, string currentDatabase, string whereType, bool beginTransaction )
 {
 	vector< Attribute > attributes;
 	vector< string > contentOutput;
 	SetCondition sCond;
 	WhereCondition wCond;
-	string filePath = "/" + currentDatabase + "/" + tableName;
+	string filePath = "/" + currentDatabase + "/" + tableTempName;
 	string temp;
 	vector< int > recordsModified;
 	int contentLineCount = 0;
 	double tempDouble;
 	ifstream fin( ( currentWorkingDirectory + filePath ).c_str() );
+
+
+	//check if table is locked before updating
+	if( !tableLock( currentWorkingDirectory, currentDatabase ) )
+	{
+		//output error if another process has control of the table
+		cout << "-- Error: Table " << tableName << " is locked!" << endl;
+		return;
+	}
 
 	//get attributes
 		//get until end of line
@@ -1376,6 +1385,14 @@ void Table::tableDelete( string currentWorkingDirectory, string currentDatabase,
 		}
 	}
 	fin.close();
+
+
+	if( tableLock( currentWorkingDirectory, currentDatabase ) && beginTransaction )
+	{
+		tableTempName = tableName + "_temp";
+		filePath = "/" + currentDatabase + "/" + tableTempName;
+
+	}
 
 	ofstream fout( ( currentWorkingDirectory + filePath ).c_str() );
 	
@@ -2086,7 +2103,7 @@ void Table::outerJoin( string currentWorkingDirectory, string currentDatabase, s
  *          
  * @pre none
  *
- * @post true if we own lock, false if not
+ * @post true if we own lock, false if
  *
  * @par Algorithm 
  *     if table belongs to us, then continue writing to modified file,
