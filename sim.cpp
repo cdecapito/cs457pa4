@@ -106,6 +106,8 @@ void removeCarriageReturn( string &input );
 
 Database* getDatabase( vector< Database > &dbms, string databaseName );
 
+void getDatabaseStructure( vector<Database> &dbms, string databaseSystemDirectory );
+
 /**
  * @brief read_Directory method
  *
@@ -162,64 +164,13 @@ void startSimulation( string currentWorkingDirectory )
 {
 	currentWorkingDirectory += "/DatabaseSystem";
 
-	// Check if the database system directory exists
-	struct stat buffer;
-	if( !( stat( currentWorkingDirectory.c_str(), &buffer ) == 0 ) )
-	{
-		// if not, create it.
-		system( ( "mkdir " + currentWorkingDirectory ).c_str() );
-	}
-
 	string input;
 	string temp;
 	string currentDatabase;
 	vector< Database > dbms;
 
-	// Retrieve all of the information about existing directories
-	vector< string > directoryItems;
-	if( read_directory( currentWorkingDirectory, directoryItems ) )
-	{
-		for( unsigned int i = 0; i < directoryItems.size(); i++ )
-		{
-			if(directoryItems[i] == "." || directoryItems[i] == "..")
-			{
-				directoryItems.erase(directoryItems.begin() + i);
-				i--;
-			}
-			else
-			{
-				Database tempDatabase;
-				tempDatabase.databaseName = directoryItems[i];
-
-				vector< string > tableItems;
-				Table tempTable;
-
-				if( read_directory( currentWorkingDirectory + "/" + tempDatabase.databaseName, tableItems ) )
-				{
-					for( unsigned int j = 0; j < tableItems.size(); j++ )
-					{
-						if(tableItems[j] == "." || tableItems[j] == "..")
-						{
-							tableItems.erase(tableItems.begin() + j);
-							j--;
-						}
-						else
-						{
-							tempTable.tableTempName = tempTable.tableName = tableItems[j];
-							tempTable.tableIsLocked = false;
-							tempDatabase.databaseTable.push_back(tempTable);
-						}
-					}
-				}
-
-				dbms.push_back(tempDatabase);
-			}
-		}
-	}
-
 	bool simulationEnd = false;
 	do{
-		
 		getline( cin, input );
 
 		//converts dos to unix file by removing file \r
@@ -244,6 +195,8 @@ void startSimulation( string currentWorkingDirectory )
 		//first checks that data is valid, if not valid will not check for semi colon
 		if(  !simulationEnd && stringValid( input ) ) 
 		{ 
+			getDatabaseStructure( dbms, currentWorkingDirectory );
+
 			//call helper function to check if modifying db or tbl
 			simulationEnd = startEvent( input, dbms, currentWorkingDirectory, currentDatabase );
 		}
@@ -1013,6 +966,88 @@ bool databaseExists( vector<Database> dbms, Database dbInput, int &dbReturn )
 		}
 	}
 	return false;
+}
+
+/*
+* @brief getDatabaseStructure
+*
+* @details
+*
+* @pre
+*
+* @post
+*
+* @par
+*
+* @param [in/out]
+*
+* @param [in]
+*
+* @return
+*/
+void getDatabaseStructure( vector<Database> &dbms, string databaseSystemDirectory )
+{
+	// Check if the database system directory exists
+    struct stat buffer;
+	if( !( stat( databaseSystemDirectory.c_str(), &buffer ) == 0 ) )
+		// if not, create it.
+		system( ( "mkdir " + databaseSystemDirectory ).c_str() );
+
+	// Retrieve all of the information about existing directories
+	vector< string > directoryItems;
+
+	if( read_directory( databaseSystemDirectory, directoryItems ) )
+	{
+		for( unsigned int i = 0; i < directoryItems.size(); i++ )
+		{
+			if(directoryItems[i] == "." || directoryItems[i] == "..")
+			{
+				directoryItems.erase(directoryItems.begin() + i);
+				i--;
+			}
+			else
+			{
+				Database* tempDatabase = getDatabase( dbms, directoryItems[i] );
+
+				// Need to add database to system
+				if( tempDatabase == NULL )
+				{
+					tempDatabase = new Database();
+					tempDatabase->databaseName = directoryItems[i];
+
+					dbms.push_back( *tempDatabase );
+				}
+
+				vector< string > tableItems;
+
+				if( read_directory( databaseSystemDirectory + "/" + tempDatabase->databaseName, tableItems ) )
+				{
+					for( unsigned int j = 0; j < tableItems.size(); j++ )
+					{
+						// ignore items that are current directory, previous directory, or temp files.
+						if(tableItems[j] == "." || tableItems[j] == ".." || (tableItems[j].find("_temp") != string::npos))
+						{
+							tableItems.erase(tableItems.begin() + j);
+							j--;
+						}
+						else
+						{
+							Table* tempTable = tempDatabase->getTable( tableItems[j] );
+
+							// Check if table is already in database
+							if ( tempTable == NULL )
+							{
+								tempTable = new Table();
+								tempTable->tableName = tableItems[j];
+
+								tempDatabase->databaseTable.push_back( *tempTable );
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 
