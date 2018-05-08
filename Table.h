@@ -58,7 +58,7 @@ class Table{
 		
 		void tableSelect( string currentWorkingDirectory, string currentDatabase, string whereType, string queryType );
 		
-		void tableInsert( string currentWorkingDirectory, string currentDatabase, string tblName, string input, bool &errorCode );
+		void tableInsert( string currentWorkingDirectory, string currentDatabase, string tblName, string input, bool &errorCode, bool beginTransaction );
 		void tableUpdate( string currentWorkingDirectory, string currentDatabase, string whereType, string setType, bool beginTransaction );
 		void tableDelete( string currentWorkingDirectory, string currentDatabase, string whereType, bool beginTransaction );
 		

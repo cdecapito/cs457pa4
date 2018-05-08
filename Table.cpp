@@ -1040,12 +1040,19 @@ void Table::tableSelect( string currentWorkingDirectory, string currentDatabase,
  *@param [in] bool &errorCode
  *
 */
-void Table::tableInsert( string currentWorkingDirectory, string currentDatabase, string tblName, string input, bool &errorCode )
+void Table::tableInsert( string currentWorkingDirectory, string currentDatabase, string tblName, string input, bool &errorCode, bool beginTransaction )
 {
 	string contentStr = "\n";
 	int commaCount;
 	string filePath = "/" + currentDatabase + "/" + tableName;
 	string temp;
+
+	if( beginTransaction && !tableLock( currentWorkingDirectory, currentDatabase ) )
+	{
+		//output error if another process has control of the table
+		cout << "-- Error: Table " << tableName << " is locked!" << endl;
+		return;
+	}
 
 	commaCount = getCommaCount( input );
 	for( int index = 0; index < commaCount; index++ )
@@ -1064,6 +1071,12 @@ void Table::tableInsert( string currentWorkingDirectory, string currentDatabase,
 	//remove leading WS from input
 	removeLeadingWS( input );
 	contentStr = contentStr + input;
+
+	if( beginTransaction && tableLock( currentWorkingDirectory, currentDatabase ) )
+	{
+		tableTempName = tableName + "_temp";
+		filePath = "/" + currentDatabase + "/" + tableTempName;
+	}
 
 	ofstream fout;
 	fout.open( ( currentWorkingDirectory + filePath ).c_str(), ofstream::out | ofstream::app );
@@ -1103,7 +1116,7 @@ void Table::tableUpdate( string currentWorkingDirectory, string currentDatabase,
 
 
 	//check if table is locked before updating
-	if( !tableLock( currentWorkingDirectory, currentDatabase ) )
+	if( beginTransaction && !tableLock( currentWorkingDirectory, currentDatabase ) )
 	{
 		//output error if another process has control of the table
 		cout << "-- Error: Table " << tableName << " is locked!" << endl;
@@ -1159,11 +1172,10 @@ void Table::tableUpdate( string currentWorkingDirectory, string currentDatabase,
 	fin.close();
 
 
-	if( tableLock( currentWorkingDirectory, currentDatabase ) && beginTransaction )
+	if( beginTransaction && tableLock( currentWorkingDirectory, currentDatabase ) )
 	{
 		tableTempName = tableName + "_temp";
 		filePath = "/" + currentDatabase + "/" + tableTempName;
-
 	}
 
 	ofstream fout( ( currentWorkingDirectory + filePath ).c_str() );
@@ -1335,9 +1347,8 @@ void Table::tableDelete( string currentWorkingDirectory, string currentDatabase,
 	double tempDouble;
 	ifstream fin( ( currentWorkingDirectory + filePath ).c_str() );
 
-
 	//check if table is locked before updating
-	if( !tableLock( currentWorkingDirectory, currentDatabase ) )
+	if( beginTransaction && !tableLock( currentWorkingDirectory, currentDatabase ) )
 	{
 		//output error if another process has control of the table
 		cout << "-- Error: Table " << tableName << " is locked!" << endl;
@@ -1387,7 +1398,7 @@ void Table::tableDelete( string currentWorkingDirectory, string currentDatabase,
 	fin.close();
 
 
-	if( tableLock( currentWorkingDirectory, currentDatabase ) && beginTransaction )
+	if( beginTransaction && tableLock( currentWorkingDirectory, currentDatabase ) )
 	{
 		tableTempName = tableName + "_temp";
 		filePath = "/" + currentDatabase + "/" + tableTempName;

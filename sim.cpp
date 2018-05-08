@@ -196,7 +196,6 @@ void startSimulation( string currentWorkingDirectory )
 		if(  !simulationEnd && stringValid( input ) ) 
 		{ 
 			getDatabaseStructure( dbms, currentWorkingDirectory );
-
 			//call helper function to check if modifying db or tbl
 			simulationEnd = startEvent( input, dbms, currentWorkingDirectory, currentDatabase );
 		}
@@ -714,31 +713,47 @@ bool startEvent( string input, vector< Database> &dbms, string currentWorkingDir
 		}
 
 		//check that current db exists
-		Database dbTemp;
-		dbTemp.databaseName = currentDatabase;
-		databaseExists( dbms, dbTemp, dbReturn );
+		bool dbExists = true;
+		bool tblExists = true;
 
-		//get table 
-		Table tblTemp;
-		tblTemp.tableName = getNextWord( input );
+		Database *dbTemp = getDatabase( dbms, currentDatabase );
+		if( dbTemp == NULL )
+		{
+			//db does not exist
+			dbExists = false;
+		}
 
+		string tableName = getNextWord( input );
 
-		//check if table exists
-		if( !(dbms[ dbReturn ].tableExists( tblTemp.tableName, tblReturn )) )
+		Table *tblTemp = dbTemp->getTable( tableName );
+
+		if( tblTemp == NULL )
+		{
+			//table doesent exist
+			tblExists = false;
+		}
+
+		if( !dbExists )
+		{
+			errorExists = true;
+			errorType = ERROR_DB_NOT_EXISTS;
+			errorContainerName = currentDatabase;
+		}
+		else if( !tblExists )
 		{
 			//if it doesnt exist then return error
 			errorExists = true;
 			errorType = ERROR_TBL_NOT_EXISTS;
-			errorContainerName = tblTemp.tableName;
+			errorContainerName = tableName;
 		}
-		else if( !errorExists )
+		else
 		{
 			//table exists and we can modify it
 			//return only stuff between parentheses
 			input.erase( 0, input.find( "(" ) + 1 );
 			input.erase( input.find_last_of( ")" ), input.length()-1 );
 
-			tblTemp.tableInsert( currentWorkingDirectory, currentDatabase, tblTemp.tableName, input, attrError );
+			tblTemp->tableInsert( currentWorkingDirectory, currentDatabase, tblTemp->tableName, input, attrError, BEGINTRANSACTION );
 		}	
 	}
 	else if( actionType.compare( UPDATE ) == 0 )
@@ -1016,6 +1031,7 @@ void getDatabaseStructure( vector<Database> &dbms, string databaseSystemDirector
 					tempDatabase->databaseName = directoryItems[i];
 
 					dbms.push_back( *tempDatabase );
+					tempDatabase = &dbms[ dbms.size() - 1 ];
 				}
 
 				vector< string > tableItems;
